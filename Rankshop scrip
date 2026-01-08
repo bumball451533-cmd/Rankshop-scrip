@@ -1,10 +1,11 @@
 -- ==========================================
---        RANKSHOPPLUS | DAILY KEY SYSTEM
+--        RANKSHOPPLUS | OFFICIAL VERSION
 -- ==========================================
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 
 -- [ 1. ระบบ INTRO RANKSHOPPLUS ]
 local function ShowIntro()
@@ -19,12 +20,12 @@ local function ShowIntro()
     textLabel.Text = "RANKSHOPPLUS"
     textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     textLabel.Font = Enum.Font.GothamBold
-    textLabel.TextSize = 60
+    textLabel.TextSize = 65
     textLabel.TextTransparency = 1
     textLabel.Parent = screenGui
 
     local uiStroke = Instance.new("UIStroke")
-    uiStroke.Thickness = 3
+    uiStroke.Thickness = 4
     uiStroke.Color = Color3.fromRGB(255, 0, 0)
     uiStroke.Transparency = 1
     uiStroke.Parent = textLabel
@@ -40,54 +41,61 @@ end
 
 ShowIntro()
 
--- [ 2. ระบบจัดการคีย์ ]
+-- [ 2. ระบบจัดการคีย์และเวลา ]
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
--- ตั้งค่าคีย์แอดมิน 2 คีย์
-local AdminKeys = {
-    ["RSP-ADMIN-9999"] = true,
-    ["RSP-ADMIN-2026"] = true
-}
-
--- ตั้งค่าคีย์ทั่วไป 100 คีย์ (สถานะ: 1 วัน)
+local AdminKeys = { ["RSP-ADMIN-9999"] = true, ["RSP-ADMIN-2026"] = true }
 local DailyKeys = {}
-for i=1, 100 do
-    DailyKeys[string.format("RSP-NEW-%03d", i)] = true
+for i=1, 100 do DailyKeys[string.format("RSP-NEW-%03d", i)] = true end
+
+-- ฟังก์ชันตรวจสอบและจับเวลา
+local function CheckExpiry(key)
+    local folderName = "RANKSHOPPLUS_KEYS"
+    local fileName = folderName .. "/" .. key .. ".json"
+    local currentTime = os.time()
+    local oneDay = 86400
+
+    if not isfolder(folderName) then makefolder(folderName) end
+
+    if isfile(fileName) then
+        local data = HttpService:JSONDecode(readfile(fileName))
+        local expireTime = data.expire
+        if currentTime > expireTime then
+            return false, "❌ คีย์นี้หมดอายุแล้ว!"
+        else
+            local timeLeft = expireTime - currentTime
+            local hours = math.floor(timeLeft / 3600)
+            return true, "✅ เหลือเวลา: " .. hours .. " ชม."
+        end
+    else
+        local expireTime = currentTime + oneDay
+        local data = {expire = expireTime}
+        writefile(fileName, HttpService:JSONEncode(data))
+        return true, "🚀 เริ่มนับเวลา 24 ชม.!"
+    end
 end
 
-local function StartScript(is_admin)
-    local status = is_admin and "Admin Access" or "1 Day Access"
-    Fluent:Notify({
-        Title = "RANKSHOPPLUS",
-        Content = "✅ คีย์ถูกต้อง ("..status..")! กำลังเริ่มระบบ...",
-        Duration = 5
-    })
-    
-    Config = {
-        Team = "Pirates",
-        Configuration = { HopWhenIdle = true, AutoHop = true, AutoHopDelay = 3600, FpsBoost = false, BlackScreen = false },
-        Items = { Saber = true, CursedDualKatana = true, SanguineArt = true, SoulGuitar = true, AutoFullyMelees = true, RaceV2 = true, RaceV3 = true },
-        Settings = { StayInSea2UntilHaveDarkFragments = true }
-    }
+local function StartScript()
+    -- ลิงก์สคริปต์หลัก (กลับมาเป็นแบบปกติแล้ว)
+    local MainURL = "https://raw.githubusercontent.com/bumball451533-cmd/Rankshop-scrip/refs/heads/main/Rankshop%20scrip"
     
     game:GetService("RunService"):Set3dRenderingEnabled(true)
-    -- โหลดสคริปต์หลัก
-    loadstring(game:HttpGet("\104\116\116\112\115\058\047\047\114\097\119\046\103\105\116\104\117\098\117\115\101\114\099\111\110\116\101\110\116\046\099\111\109\047\104\104\108\050\057\048\052\050\048\048\056\045\111\112\115\047\115\099\114\105\112\116\047\114\101\102\115\047\104\101\097\100\115\047\109\097\105\110\047\099\097\099"))()
+    loadstring(game:HttpGet(MainURL))()
 end
 
 -- [ 3. หน้าต่างใส่คีย์ ]
 local Window = Fluent:CreateWindow({
-    Title = "RANKSHOPPLUS | Verify System",
-    SubTitle = "Admin & 1 Day Key",
+    Title = "RANKSHOPPLUS | License System",
+    SubTitle = "Security v3",
     TabWidth = 160, Size = UDim2.fromOffset(450, 300),
     Acrylic = true, Theme = "Dark"
 })
 
-local Tab = Window:AddTab({ Title = "Check License", Icon = "key" })
+local Tab = Window:AddTab({ Title = "Verify Key", Icon = "key" })
 
 local KeyInput = ""
 Tab:AddInput("Input", {
-    Title = "ใส่คีย์ของคุณ",
+    Title = "ป้อนคีย์ของคุณ",
     Callback = function(Value)
         KeyInput = string.upper(Value):gsub("%s+", "")
     end
@@ -98,13 +106,29 @@ Tab:AddButton({
     Callback = function()
         if AdminKeys[KeyInput] then
             Window:Destroy()
-            StartScript(true)
+            StartScript()
         elseif DailyKeys[KeyInput] then
-            -- ในอนาคตคุณสามารถเพิ่มโค้ดเช็คเวลาจริงจาก Database ได้ตรงนี้
-            Window:Destroy()
-            StartScript(false)
+            local is_valid, message = CheckExpiry(KeyInput)
+            if is_valid then
+                Fluent:Notify({Title="RANKSHOPPLUS", Content=message, Duration=5})
+                Window:Destroy()
+                StartScript()
+            else
+                Fluent:Notify({Title="RANKSHOPPLUS", Content=message, Duration=5})
+            end
         else
-            Fluent:Notify({Title="RANKSHOPPLUS", Content="❌ คีย์ไม่ถูกต้องหรือหมดอายุ!", Duration=5})
+            Fluent:Notify({Title="RANKSHOPPLUS", Content="❌ คีย์ไม่ถูกต้อง!", Duration=5})
+        end
+    end
+})
+
+Tab:AddButton({
+    Title = "Get Key / Support",
+    Callback = function()
+        setclipboard("ติดต่อ RANKSHOPPLUS")
+        Fluent:Notify({Title="RANKSHOPPLUS", Content="คัดลอกช่องทางติดต่อแล้ว!", Duration=5})
+    end
+})
         end
     end
 })
