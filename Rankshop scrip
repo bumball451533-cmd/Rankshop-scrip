@@ -1,5 +1,5 @@
 -- ==========================================
---        RANKSHOPPLUS | OFFICIAL VERSION
+--        RANKSHOPPLUS | STABLE FIX v4
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -30,91 +30,82 @@ local function ShowIntro()
     uiStroke.Transparency = 1
     uiStroke.Parent = textLabel
 
-    TweenService:Create(textLabel, TweenInfo.new(1.2), {TextTransparency = 0}):Play()
-    TweenService:Create(uiStroke, TweenInfo.new(1.2), {Transparency = 0}):Play()
+    TweenService:Create(textLabel, TweenInfo.new(1), {TextTransparency = 0}):Play()
+    TweenService:Create(uiStroke, TweenInfo.new(1), {Transparency = 0}):Play()
     task.wait(2)
-    TweenService:Create(textLabel, TweenInfo.new(1.2), {TextTransparency = 1}):Play()
-    TweenService:Create(uiStroke, TweenInfo.new(1.2), {Transparency = 1}):Play()
-    task.wait(1.2)
+    TweenService:Create(textLabel, TweenInfo.new(1), {TextTransparency = 1}):Play()
+    TweenService:Create(uiStroke, TweenInfo.new(1), {Transparency = 1}):Play()
+    task.wait(1)
     screenGui:Destroy()
 end
 
-ShowIntro()
-
 -- [ 2. ระบบจัดการคีย์และเวลา ]
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local function CheckExpiry(key)
+    local fileName = "RSP_" .. key .. ".json"
+    local currentTime = os.time()
+    local oneDay = 86400
+
+    if isfile(fileName) then
+        local success, data = pcall(function() return HttpService:JSONDecode(readfile(fileName)) end)
+        if not success then return true, "🔄 ไฟล์เสียหาย กำลังเริ่มนับใหม่..." end
+        
+        if currentTime > data.expire then
+            return false, "❌ คีย์หมดอายุแล้ว!"
+        else
+            return true, "✅ ยินดีต้อนรับกลับ (เวลาเดินต่อ)"
+        end
+    else
+        local data = {expire = currentTime + oneDay}
+        writefile(fileName, HttpService:JSONEncode(data))
+        return true, "🚀 เริ่มนับเวลาใช้งาน 24 ชม.!"
+    end
+end
+
+-- [ 3. โหลด GUI และเริ่มระบบ ]
+local FluentURL = "https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"
+local success, Fluent = pcall(function() return loadstring(game:HttpGet(FluentURL))() end)
+
+if not success then
+    warn("❌ ไม่สามารถโหลด Fluent ได้! กรุณารันใหม่อีกครั้ง")
+    return
+end
+
+ShowIntro()
 
 local AdminKeys = { ["RSP-ADMIN-9999"] = true, ["RSP-ADMIN-2026"] = true }
 local DailyKeys = {}
 for i=1, 100 do DailyKeys[string.format("RSP-NEW-%03d", i)] = true end
 
--- ฟังก์ชันตรวจสอบและจับเวลา
-local function CheckExpiry(key)
-    local folderName = "RANKSHOPPLUS_KEYS"
-    local fileName = folderName .. "/" .. key .. ".json"
-    local currentTime = os.time()
-    local oneDay = 86400
-
-    if not isfolder(folderName) then makefolder(folderName) end
-
-    if isfile(fileName) then
-        local data = HttpService:JSONDecode(readfile(fileName))
-        local expireTime = data.expire
-        if currentTime > expireTime then
-            return false, "❌ คีย์นี้หมดอายุแล้ว!"
-        else
-            local timeLeft = expireTime - currentTime
-            local hours = math.floor(timeLeft / 3600)
-            return true, "✅ เหลือเวลา: " .. hours .. " ชม."
-        end
-    else
-        local expireTime = currentTime + oneDay
-        local data = {expire = expireTime}
-        writefile(fileName, HttpService:JSONEncode(data))
-        return true, "🚀 เริ่มนับเวลา 24 ชม.!"
-    end
-end
-
-local function StartScript()
-    -- ลิงก์สคริปต์หลัก (กลับมาเป็นแบบปกติแล้ว)
-    local MainURL = "https://raw.githubusercontent.com/bumball451533-cmd/Rankshop-scrip/refs/heads/main/Rankshop%20scrip"
-    
-    game:GetService("RunService"):Set3dRenderingEnabled(true)
-    loadstring(game:HttpGet(MainURL))()
-end
-
--- [ 3. หน้าต่างใส่คีย์ ]
 local Window = Fluent:CreateWindow({
-    Title = "RANKSHOPPLUS | License System",
-    SubTitle = "Security v3",
+    Title = "RANKSHOPPLUS",
+    SubTitle = "Security System v4",
     TabWidth = 160, Size = UDim2.fromOffset(450, 300),
     Acrylic = true, Theme = "Dark"
 })
 
 local Tab = Window:AddTab({ Title = "Verify Key", Icon = "key" })
-
 local KeyInput = ""
+
 Tab:AddInput("Input", {
     Title = "ป้อนคีย์ของคุณ",
-    Callback = function(Value)
-        KeyInput = string.upper(Value):gsub("%s+", "")
-    end
+    Callback = function(Value) KeyInput = string.upper(Value):gsub("%s+", "") end
 })
 
 Tab:AddButton({
     Title = "Check Key",
     Callback = function()
         if AdminKeys[KeyInput] then
+            Fluent:Notify({Title="RANKSHOPPLUS", Content="👑 แอดมินล็อกอินสำเร็จ", Duration=5})
             Window:Destroy()
-            StartScript()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/bumball451533-cmd/Rankshop-scrip/refs/heads/main/Rankshop%20scrip"))()
         elseif DailyKeys[KeyInput] then
-            local is_valid, message = CheckExpiry(KeyInput)
+            local is_valid, msg = CheckExpiry(KeyInput)
             if is_valid then
-                Fluent:Notify({Title="RANKSHOPPLUS", Content=message, Duration=5})
+                Fluent:Notify({Title="RANKSHOPPLUS", Content=msg, Duration=5})
                 Window:Destroy()
-                StartScript()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/bumball451533-cmd/Rankshop-scrip/refs/heads/main/Rankshop%20scrip"))()
             else
-                Fluent:Notify({Title="RANKSHOPPLUS", Content=message, Duration=5})
+                Fluent:Notify({Title="RANKSHOPPLUS", Content=msg, Duration=5})
             end
         else
             Fluent:Notify({Title="RANKSHOPPLUS", Content="❌ คีย์ไม่ถูกต้อง!", Duration=5})
@@ -123,20 +114,6 @@ Tab:AddButton({
 })
 
 Tab:AddButton({
-    Title = "Get Key / Support",
-    Callback = function()
-        setclipboard("ติดต่อ RANKSHOPPLUS")
-        Fluent:Notify({Title="RANKSHOPPLUS", Content="คัดลอกช่องทางติดต่อแล้ว!", Duration=5})
-    end
-})
-        end
-    end
-})
-
-Tab:AddButton({
-    Title = "รับคีย์ถาวร / รายวัน",
-    Callback = function()
-        setclipboard("ติดต่อ RANKSHOPPLUS")
-        Fluent:Notify({Title="RANKSHOPPLUS", Content="คัดลอกช่องทางติดต่อแล้ว!", Duration=5})
-    end
+    Title = "คัดลอกช่องทางติดต่อ",
+    Callback = function() setclipboard("ติดต่อ RANKSHOPPLUS") end
 })
